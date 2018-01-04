@@ -1,0 +1,265 @@
+// Zip Lines by Kevin "Talon1024" Caccamo
+// License: GPL v2
+// Copyright Kevin Caccamo 2018
+
+/**
+ * An endpoint for a zip line
+ *
+ * The TID of the zip line endpoint defines which zip line it belongs to.
+ * Zip line endpoints can require specific items to ascend or descend them.
+ *
+ * The AscendItem property defines which item is required to ascend the zip line.
+ * The DescendItem property defines which item is required to descend the zip line.
+ * The VisualEffect property defines the actor to use as the "rope" of the zip line.
+ * The InteractionIcon property defines an actor to spawn at the endpoint.
+ * The ZippingItem property defines what active zip line item to give to the player.
+ * The AscendItemNeededMessage property defines the message to use if the player cannot ascend the zip line without a particular item.
+ * The DescendItemNeededMessage property defines the message to use if the player cannot descend the zip line without a particular item.
+ * The StartDistance property defines the initial distance from the endpoint when the player gets on the zip line.
+ */
+class ZipLineEndpoint : SwitchableDecoration
+{
+	ZipLineEndpoint OtherEndpoint; // Other endpoint of zip line. Must have same TID as this endpoint.
+	class<OnZipLine> ZippingItem; // Item that performs the zip line physics logic.
+	class<Inventory> AscendItem; // Item required to ascend zip line.
+	class<Inventory> DescendItem; // Item required to descend zip line.
+	class<Actor> VisualEffect; // Visual effect (To be spawned by A_SpawnActorLine)
+	class<Actor> InteractionIcon; // Visual effect that indicates interactability
+	String AscendItemNeededMessage; // Message to player indicating need for ascent item
+	String DescendItemNeededMessage; // Message to player indicating need for descent item
+	double ZipStartDistance;
+	int8 ZipDirection; // Direction to other endpoint.
+
+	// ZipDirection == 0    <-- No height difference
+	// ZipDirection == 1    <-- Other endpoint is higher
+	// ZipDirection == -1   <-- Other endpoint is lower
+
+	Property DescendItem : DescendItem;
+	Property AscendItem : AscendItem;
+	Property VisualEffect : VisualEffect;
+	Property InteractionIcon : InteractionIcon;
+	Property ZippingItem : ZippingItem;
+	Property AscendItemNeededMessage : AscendItemNeededMessage;
+	Property DescendItemNeededMessage : DescendItemNeededMessage;
+	Property StartDistance : ZipStartDistance;
+
+	Default {
+		Radius 16;
+		Height 32;
+		Activation THINGSPEC_ThingTargets | THINGSPEC_Switch; // THINGSPEC_Activate or Deactivate seems to only allow said thing to be either activated or deactivated for some stupid reason...
+		ZipLineEndpoint.VisualEffect "ZipLineVisual";
+		ZipLineEndpoint.InteractionIcon "ProximityInteractionIcon";
+		ZipLineEndpoint.ZippingItem "OnZipLine";
+		ZipLineEndpoint.AscendItemNeededMessage "$ZIPASCENDITEMNEEDED";
+		ZipLineEndpoint.DescendItemNeededMessage "$ZIPDESCENDITEMNEEDED";
+		ZipLineEndpoint.StartDistance 16.0;
+		+USESPECIAL;
+	}
+
+	States
+	{
+	Spawn:
+		ZPLN A 0; // Why doesn't NoDelay work here?
+	Init:
+		"####" "#" 0 {
+			if (InteractionIcon) {
+				A_SpawnItemEx(InteractionIcon, 0.0, 0.0, 16.0);
+			}
+
+			if (VisualEffect) {
+				vector3 ZipVisualPosA = Pos;
+				ZipVisualPosA.Z += 32.0;
+				vector3 ZipVisualPosB = OtherEndpoint.Pos;
+				ZipVisualPosB.Z += 32.0;
+
+				A_SpawnActorLine(VisualEffect, ZipVisualPosA, ZipVisualPosB, 40.0);
+			}
+		}
+	Idle:
+		"####" "#" -1;
+		Stop;
+	Active:
+		"####" "#" 0 {
+			if (OtherEndpoint) {
+				if ((ZipDirection == -1 && CanDescend()) ||
+					(ZipDirection == 1 && CanAscend()) ||
+					 ZipDirection == 0) {
+
+					// Initialize zip line active item
+					OnZipLine zipThing = OnZipLine(GiveInventoryType(ZippingItem));
+					zipThing.StartEndpoint = self;
+					zipThing.FinishEndpoint = OtherEndpoint;
+					zipThing.ZipLinePitch = PitchTo(OtherEndpoint);
+					zipthing.ZipLineAngle = AngleTo(OtherEndpoint, true);
+					target.AddInventory(zipThing);
+
+					// Put player in front of endpoint to begin with
+					target.SetXYZ(Vec3Angle(ZipStartDistance, target.Angle, 0.0, false));
+					target.Angle = AngleTo(OtherEndpoint, true);
+					target.Pitch = PitchTo(OtherEndpoint);
+				}
+			}
+		}
+		Goto Idle;
+	Inactive:
+		Goto Active; // This works... Somehow.
+	}
+
+	// Thanks, ZWiki!
+	// https://zdoom.org/wiki/A_SpawnActorLine
+	action void A_SpawnActorLine(class<Actor> classname, Vector3 pointA, Vector3 pointB, double units = 1)
+	{
+		// get a vector pointing from A to B
+		let pointAB = pointB - pointA;
+
+		// get distance
+		let dist = pointAB.Length();
+
+		// normalize it
+		pointAB /= dist == 0 ? 1 : dist;
+
+		// get angle and pitch of line
+		double lineAngle = atan2(pointB.y - pointA.y, pointB.x - pointA.x);
+		double linePitch = atan2(pointA.z - pointB.z, dist);
+
+		// iterate in units of 'units'
+		for (double i = 0; i < dist; i += units)
+		{
+			// we can now use 'pointA + i * pointAB' to
+			// get a position that is 'i' units away from
+			// pointA, heading in the direction towards pointB
+			let position = pointA + i * pointAB;
+			Actor spawned = Spawn(classname, position, ALLOW_REPLACE);
+			spawned.angle = lineAngle;
+			spawned.pitch = linePitch;
+		}
+	}
+
+	ZipLineEndpoint FindOtherEndpoint() {
+		ActorIterator iter = ActorIterator.Create(TID, "ZipLineEndpoint");
+		Actor other;
+		while (other = iter.Next()) {
+			if (other == self) continue;
+			return ZipLineEndpoint(other);
+		}
+		Console.Printf("\cRWarning\cC: No other endpoint found for ZipLineEndpoint (TID %d)", TID);
+		return null;
+	}
+
+	override void PostBeginPlay() {
+		OtherEndpoint = FindOtherEndpoint();
+		ZipDirection = 0;
+		if (OtherEndpoint.Pos.z < Pos.z) {
+			ZipDirection = -1;
+		} else if (OtherEndpoint.Pos.z > Pos.z) {
+			ZipDirection = 1;
+		}
+	}
+
+	virtual bool CanDescend() {
+		if (ZipDirection == 0) return true;
+		if (ZipDirection == -1) {
+			if (DescendItem != null) {
+				if (target.FindInventory(DescendItem)) {
+					return true;
+				} else {
+					A_Print(DescendItemNeededMessage);
+					return false;
+				}
+			} else {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	virtual bool CanAscend() {
+		if (ZipDirection == 0) return true;
+		if (ZipDirection == 1) {
+			if (AscendItem != null) {
+				if (target.FindInventory(AscendItem)) {
+					return true;
+				} else {
+					A_Print(AscendItemNeededMessage);
+					return false;
+				}
+			} else {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	double PitchTo(Actor other) {
+		double dist = Distance2D(other);
+		double vdist = self.Pos.Z - other.Pos.Z;
+		return atan2(vdist, dist);
+	}
+}
+
+/**
+ * An effect item that is given to the player while on the zip line, and taken
+ * away once the player leaves the zip line.
+ * 
+ * MinDistance defines the minimum distance to the other zip line endpoint in
+ * order for the player to get off. Don't set this too small or else the player
+ * won't leave the zip line automatically! 20 is miniscule, so this is 30 by
+ * default.
+ *
+ * ZipLineSpeed defines the default speed for travelling on the zip line.
+ * ZipLineAccel defines the rate at which the player changes speed on the zip line
+ * MaxSpeed defines the maximum speed for travelling on the zip line.
+ */
+class OnZipLine : Inventory {
+	ZipLineEndpoint StartEndpoint;
+	ZipLineEndpoint FinishEndpoint;
+	double MinFinishDistance; // Minimum distance to finish endpoint
+	double ZipLineAngle; // Angle of start endpoint to finish endpoint
+	double ZipLinePitch; // Pitch of zip line
+	double ZipLineSpeed; // Speed of zip line
+	double ZipLineMaxSpeed; // Max speed players can traverse zip lines
+	double ZipLineAccel; // Rate at which player can change speed on zip line
+	bool LeftStart;
+
+	Property MinDistance: MinFinishDistance;
+	Property ZipLineSpeed: ZipLineSpeed;
+	Property ZipLineAccel: ZipLineAccel;
+	Property MaxSpeed: ZipLineMaxSpeed;
+
+	Default {
+		Inventory.MaxAmount 1;
+		OnZipLine.MinDistance 30.0;
+		OnZipLine.ZipLineSpeed 5.0;
+		OnZipLine.ZipLineAccel 0.3;
+		OnZipLine.MaxSpeed 9.0;
+		+INVENTORY.UNDROPPABLE;
+	}
+
+	override void BeginPlay() {
+		LeftStart = false;
+	}
+
+	override void DoEffect() {
+		if (!LeftStart && Owner.Distance3D(StartEndpoint) > MinFinishDistance) {
+			LeftStart = true;
+		}
+
+		if (Owner.Player) {
+			if (Owner.Player.cmd.forwardmove > 1) {
+				ZipLineSpeed += ZipLineAccel;
+				if (ZipLineSpeed > ZipLineMaxSpeed) ZipLineSpeed = ZipLineMaxSpeed;
+			} else if (Owner.Player.cmd.forwardmove < 0) {
+				ZipLineSpeed -= ZipLineAccel;
+				if (ZipLineSpeed < -ZipLineMaxSpeed) ZipLineSpeed = -ZipLineMaxSpeed;
+			}
+		}
+
+		Owner.Vel3DFromAngle(ZipLineSpeed, ZipLineAngle, ZipLinePitch);
+		if (LeftStart) {
+			if (Owner.Distance3D(StartEndpoint) < MinFinishDistance || 
+				Owner.Distance3D(FinishEndpoint) < MinFinishDistance) {
+				Destroy();
+			}
+		}
+	}
+}

@@ -1,0 +1,4 @@
+[enu default]
+
+ZIPASCENDITEMNEEDED = "You don't have the item needed to ascend the zip line!";
+ZIPDESCENDITEMNEEDED = "You don't have the item needed to descend the zip line!";

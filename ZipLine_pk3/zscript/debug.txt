@@ -1,0 +1,11 @@
+class ZipLineDebugHandler : StaticEventHandler {
+	override void RenderOverlay(RenderEvent e) {
+		Actor playermo = players[consoleplayer].mo;
+		OnZipLine zipper = OnZipLine(playermo.FindInventory("OnZipLine", true));
+		if (zipper != null) {
+			Screen.DrawText(smallfont, Font.CR_GRAY, 20, 20, String.Format("Distance from start: %f", playermo.Distance3D(zipper.StartEndpoint)));
+			Screen.DrawText(smallfont, Font.CR_GRAY, 20, 25, String.Format("Distance to finish: %f", playermo.Distance3D(zipper.FinishEndpoint)));
+			Screen.DrawText(smallfont, Font.CR_GRAY, 20, 30, String.Format("Forward move: %d", players[consoleplayer].cmd.forwardmove));
+		}
+	}
+}

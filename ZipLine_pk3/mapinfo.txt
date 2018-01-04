@@ -1,0 +1,9 @@
+DoomEdNums {
+	9600 = ZipLineEndpoint
+}
+
+/*
+GameInfo {
+	AddEventHandlers "ZipLineDebugHandler"
+}
+*/

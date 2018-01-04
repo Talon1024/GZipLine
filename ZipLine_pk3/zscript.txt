@@ -1,0 +1,5 @@
+version "3.0"
+
+#include "zscript/visualfx.txt"
+#include "zscript/zipline.txt"
+#include "zscript/debug.txt"
