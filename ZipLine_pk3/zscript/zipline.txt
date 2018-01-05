@@ -251,8 +251,8 @@ class OnZipLine : Inventory {
 	upmove - positive = up, negative = down, bounds = -768, 768
 	*/
 	virtual double GetAccel(int forwardmove, int sidemove) {
-		double FwdAngleFactor = abs(cos(Owner.Angle - ZipLineAngle));
-		double SideAngleFactor = abs(sin(Owner.Angle - ZipLineAngle));
+		double FwdAngleFactor = cos(Owner.Angle - ZipLineAngle);
+		double SideAngleFactor = sin(Owner.Angle - ZipLineAngle);
 
 		double FwdInputFactor = forwardmove / 12800.0;
 		double SideInputFactor = sidemove / 12800.0;
