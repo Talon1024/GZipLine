@@ -20,7 +20,10 @@ from the starting point towards the other endpoint.
 Press the "backward" key (usually S or down arrow) to decelerate, or to
 accelerate towards the starting endpoint.
 
-You will leave the zip line once you reach one of the endpoints.
+Press the "crouch" key to drop off the zip line.
+
+You will also leave the zip line automatically once you reach one of the
+endpoints.
 
 ----- Info for mappers -----
 

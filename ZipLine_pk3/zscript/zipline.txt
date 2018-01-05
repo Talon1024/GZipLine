@@ -252,6 +252,10 @@ class OnZipLine : Inventory {
 				ZipLineSpeed -= ZipLineAccel;
 				if (ZipLineSpeed < -ZipLineMaxSpeed) ZipLineSpeed = -ZipLineMaxSpeed;
 			}
+			if (Owner.Player.cmd.buttons & BT_CROUCH != 0) {
+				Destroy();
+				return;
+			}
 		}
 
 		Owner.Vel3DFromAngle(ZipLineSpeed, ZipLineAngle, ZipLinePitch);
