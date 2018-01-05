@@ -1,3 +1,4 @@
 ========== TODO ==========
 
+Prevent player from ascending zip line by reversing while he is still riding, and vice versa.
 Jump to drop off zip line?
