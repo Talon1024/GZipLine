@@ -1,5 +1,3 @@
 ========== TODO ==========
 
-Forward/side move factors (PlayerInfo.cmd.forwardmove accounts for controllers and mice as well.)
-Ascend/descend based on player's current direction and movement commands.
 Jump to drop off zip line?
