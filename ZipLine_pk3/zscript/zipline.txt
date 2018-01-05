@@ -244,19 +244,31 @@ class OnZipLine : Inventory {
 		LeftStart = false;
 	}
 
+	/*
+	Notes about forwardmove and sidemove:
+	forwardmove - positive = forward, negative = backward, bounds = -12800, 12800
+	sidemove - positive = right, negative = left, bounds = -12800, 12800
+	upmove - positive = up, negative = down, bounds = -768, 768
+	*/
+	virtual double GetAccel(int forwardmove, int sidemove) {
+		double FwdAngleFactor = abs(cos(Owner.Angle - ZipLineAngle));
+		double SideAngleFactor = abs(sin(Owner.Angle - ZipLineAngle));
+
+		double FwdInputFactor = forwardmove / 12800.0;
+		double SideInputFactor = sidemove / 12800.0;
+		
+		return ZipLineAccel * (FwdAngleFactor * FwdInputFactor + SideAngleFactor * SideInputFactor);
+	}
+
 	override void DoEffect() {
 		if (!LeftStart && Owner.Distance3D(StartEndpoint) > MinFinishDistance) {
 			LeftStart = true;
 		}
 
 		if (Owner.Player) {
-			if (Owner.Player.cmd.forwardmove > 1) {
-				ZipLineSpeed += ZipLineAccel;
-				if (ZipLineSpeed > ZipLineMaxSpeed) ZipLineSpeed = ZipLineMaxSpeed;
-			} else if (Owner.Player.cmd.forwardmove < 0) {
-				ZipLineSpeed -= ZipLineAccel;
-				if (ZipLineSpeed < -ZipLineMaxSpeed) ZipLineSpeed = -ZipLineMaxSpeed;
-			}
+			ZipLineSpeed += GetAccel(Owner.Player.cmd.forwardmove, Owner.Player.cmd.sidemove);
+			if (ZipLineSpeed > ZipLineMaxSpeed) ZipLineSpeed = ZipLineMaxSpeed;
+			else if (ZipLineSpeed < -ZipLineMaxSpeed) ZipLineSpeed = -ZipLineMaxSpeed;
 			if (Owner.Player.cmd.buttons & BT_CROUCH != 0) {
 				Destroy();
 				return;

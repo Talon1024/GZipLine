@@ -4,6 +4,6 @@ DoomEdNums {
 
 /*
 GameInfo {
-	AddEventHandlers "ZipLineDebugHandler"
+	AddEventHandlers = "ZipLineDebugHandler"
 }
 */
