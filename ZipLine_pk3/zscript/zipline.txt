@@ -95,7 +95,10 @@ class ZipLineEndpoint : SwitchableDecoration
 					zipThing.StartEndpoint = self;
 					zipThing.FinishEndpoint = OtherEndpoint;
 					zipThing.ZipLinePitch = PitchTo(OtherEndpoint);
-					zipthing.ZipLineAngle = AngleTo(OtherEndpoint, true);
+					zipThing.ZipLineAngle = AngleTo(OtherEndpoint, true);
+					zipThing.ZipLineDirection = ZipDirection;
+					zipThing.PCanAscend = CanAscend();
+					zipThing.PCanDescend = CanDescend();
 					target.AddInventory(zipThing);
 
 					// Put player in front of endpoint to begin with
@@ -163,34 +166,30 @@ class ZipLineEndpoint : SwitchableDecoration
 
 	virtual bool CanDescend() {
 		if (ZipDirection == 0) return true;
-		if (ZipDirection == -1) {
-			if (DescendItem != null) {
-				if (target.FindInventory(DescendItem)) {
-					return true;
-				} else {
-					A_Print(DescendItemNeededMessage);
-					return false;
-				}
-			} else {
+		if (DescendItem != null) {
+			if (target.FindInventory(DescendItem)) {
 				return true;
+			} else {
+				A_Print(DescendItemNeededMessage);
+				return false;
 			}
+		} else {
+			return true;
 		}
 		return false;
 	}
 
 	virtual bool CanAscend() {
 		if (ZipDirection == 0) return true;
-		if (ZipDirection == 1) {
-			if (AscendItem != null) {
-				if (target.FindInventory(AscendItem)) {
-					return true;
-				} else {
-					A_Print(AscendItemNeededMessage);
-					return false;
-				}
-			} else {
+		if (AscendItem != null) {
+			if (target.FindInventory(AscendItem)) {
 				return true;
+			} else {
+				A_Print(AscendItemNeededMessage);
+				return false;
 			}
+		} else {
+			return true;
 		}
 		return false;
 	}
@@ -225,6 +224,9 @@ class OnZipLine : Inventory {
 	double ZipLineMaxSpeed; // Max speed players can traverse zip lines
 	double ZipLineAccel; // Rate at which player can change speed on zip line
 	bool LeftStart;
+	bool PCanAscend;
+	bool PCanDescend;
+	int8 ZipLineDirection;
 
 	Property MinDistance: MinFinishDistance;
 	Property ZipLineSpeed: ZipLineSpeed;
@@ -266,12 +268,52 @@ class OnZipLine : Inventory {
 		}
 
 		if (Owner.Player) {
-			ZipLineSpeed += GetAccel(Owner.Player.cmd.forwardmove, Owner.Player.cmd.sidemove);
-			if (ZipLineSpeed > ZipLineMaxSpeed) ZipLineSpeed = ZipLineMaxSpeed;
-			else if (ZipLineSpeed < -ZipLineMaxSpeed) ZipLineSpeed = -ZipLineMaxSpeed;
+
 			if (Owner.Player.cmd.buttons & BT_CROUCH != 0) {
-				Destroy();
+				Destroy(); // Drop from zip line when player crouches.
 				return;
+			}
+
+			ZipLineSpeed += GetAccel(Owner.Player.cmd.forwardmove, Owner.Player.cmd.sidemove);
+			if (ZipLineDirection == 0) {
+				if (ZipLineSpeed > ZipLineMaxSpeed) {
+					ZipLineSpeed = ZipLineMaxSpeed;
+				}
+				else if (ZipLineSpeed < -ZipLineMaxSpeed) {
+					ZipLineSpeed = -ZipLineMaxSpeed;
+				}
+			} else if (ZipLineDirection == 1) { 
+				if (ZipLineSpeed > 0) {
+					if (ZipLineSpeed > ZipLineMaxSpeed) {
+						ZipLineSpeed = ZipLineMaxSpeed;
+					}
+				}
+				if (PCanDescend && ZipLineSpeed < 0) {
+					if (ZipLineSpeed < -ZipLineMaxSpeed) {
+						ZipLineSpeed = -ZipLineMaxSpeed;
+					}
+				} else {
+					ZipLineSpeed = 0;
+				}
+			} else if (ZipLineDirection == -1) {
+				if (ZipLineSpeed > 0) {
+					if (PCanDescend) {
+						if (ZipLineSpeed > ZipLineMaxSpeed) {
+							ZipLineSpeed = ZipLineMaxSpeed;
+						}
+					} else {
+						ZipLineSpeed = 0;
+					}
+				}
+				if (ZipLineSpeed < 0) {
+					if (PCanAscend) {
+						if (ZipLineSpeed < -ZipLineMaxSpeed) {
+							ZipLineSpeed = -ZipLineMaxSpeed;
+						}
+					} else {
+						ZipLineSpeed = 0;
+					}
+				}
 			}
 		}
 
