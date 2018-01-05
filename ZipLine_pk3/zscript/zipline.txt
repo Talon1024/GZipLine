@@ -284,16 +284,22 @@ class OnZipLine : Inventory {
 				}
 			} else if (ZipLineDirection == 1) { 
 				if (ZipLineSpeed > 0) {
-					if (ZipLineSpeed > ZipLineMaxSpeed) {
-						ZipLineSpeed = ZipLineMaxSpeed;
+					if (PCanAscend) {
+						if (ZipLineSpeed > ZipLineMaxSpeed) {
+							ZipLineSpeed = ZipLineMaxSpeed;
+						}
+					} else {
+						ZipLineSpeed = 0;
 					}
 				}
-				if (PCanDescend && ZipLineSpeed < 0) {
-					if (ZipLineSpeed < -ZipLineMaxSpeed) {
-						ZipLineSpeed = -ZipLineMaxSpeed;
+				if (ZipLineSpeed < 0) {
+					if (PCanDescend) {
+						if (ZipLineSpeed < -ZipLineMaxSpeed) {
+							ZipLineSpeed = -ZipLineMaxSpeed;
+						}
+					} else {
+						ZipLineSpeed = 0;
 					}
-				} else {
-					ZipLineSpeed = 0;
 				}
 			} else if (ZipLineDirection == -1) {
 				if (ZipLineSpeed > 0) {
