@@ -117,8 +117,6 @@ class ZipLineEndpoint : SwitchableDecoration
 
 					// Put player in front of endpoint to begin with
 					target.SetXYZ(Vec3Angle(ZipStartDistance, target.Angle, 0.0, false));
-					// Ensure player doesn't slip too far away from zip line.
-					target.Vel = (0,0,0);
 					// Make player face other endpoint
 					target.Angle = AngleTo(OtherEndpoint, true);
 					target.Pitch = PitchTo(OtherEndpoint);
