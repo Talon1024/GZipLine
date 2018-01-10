@@ -24,19 +24,22 @@ class ZipLineEndpoint : SwitchableDecoration
 	class<Inventory> AscendItem; // Item required to ascend zip line.
 	class<Inventory> DescendItem; // Item required to descend zip line.
 	class<Actor> VisualEffect; // Visual effect (To be spawned by A_SpawnActorLine)
-	class<Actor> InteractionIcon; // Visual effect that indicates interactability
-	String AscendItemNeededMessage; // Message to player indicating need for ascent item
-	String DescendItemNeededMessage; // Message to player indicating need for descent item
-	double ZipStartDistance;
+	class<Actor> InteractionIcon; // Visual effect that indicates interactability.
+	String AscendItemNeededMessage; // Message to player indicating need for ascent item.
+	String DescendItemNeededMessage; // Message to player indicating need for descent item.
+	double ZipStartDistance; // Initial distance from endpoint when player uses it.
+	double VisualZOffset; // Z offset of visual effect.
 	int8 ZipDirection; // Direction to other endpoint.
+	bool ZipVisualConnectee; // Is this zip line endpoint a connector or connectee?
 
-	// ZipDirection == 0    <-- No height difference
+	// ZipDirection == 0    <-- No height difference - no items needed.
 	// ZipDirection == 1    <-- Other endpoint is higher
 	// ZipDirection == -1   <-- Other endpoint is lower
 
 	Property DescendItem : DescendItem;
 	Property AscendItem : AscendItem;
 	Property VisualEffect : VisualEffect;
+	Property VisualZOffset : VisualZOffset;
 	Property InteractionIcon : InteractionIcon;
 	Property ZippingItem : ZippingItem;
 	Property AscendItemNeededMessage : AscendItemNeededMessage;
@@ -53,6 +56,7 @@ class ZipLineEndpoint : SwitchableDecoration
 		Height 32;
 		Activation THINGSPEC_ThingTargets | THINGSPEC_Switch; // THINGSPEC_Activate or Deactivate seems to only allow said thing to be either activated or deactivated for some stupid reason...
 		ZipLineEndpoint.VisualEffect "ZipLineVisual";
+		ZipLineEndpoint.VisualZOffset 32.0;
 		ZipLineEndpoint.InteractionIcon "ProximityInteractionIcon";
 		ZipLineEndpoint.ZippingItem "OnZipLine";
 		ZipLineEndpoint.AscendItemNeededMessage "$ZIPASCENDITEMNEEDED";
@@ -71,11 +75,11 @@ class ZipLineEndpoint : SwitchableDecoration
 				A_SpawnItemEx(InteractionIcon, 0.0, 0.0, 16.0);
 			}
 
-			if (VisualEffect) {
+			if (VisualEffect && !ZipVisualConnectee) {
 				vector3 ZipVisualPosA = Pos;
-				ZipVisualPosA.Z += 32.0;
+				ZipVisualPosA.Z += VisualZOffset;
 				vector3 ZipVisualPosB = OtherEndpoint.Pos;
-				ZipVisualPosB.Z += 32.0;
+				ZipVisualPosB.Z += VisualZOffset;
 
 				A_SpawnActorLine(VisualEffect, ZipVisualPosA, ZipVisualPosB, 40.0);
 			}
@@ -113,7 +117,7 @@ class ZipLineEndpoint : SwitchableDecoration
 		Goto Active; // This works... Somehow.
 	}
 
-	// Thanks, ZWiki!
+	// Thanks, ZWiki! This one is slightly modified so that the angle and pitch between the two points is taken into account.
 	// https://zdoom.org/wiki/A_SpawnActorLine
 	action void A_SpawnActorLine(class<Actor> classname, Vector3 pointA, Vector3 pointB, double units = 1)
 	{
@@ -148,7 +152,9 @@ class ZipLineEndpoint : SwitchableDecoration
 		Actor other;
 		while (other = iter.Next()) {
 			if (other == self) continue;
-			return ZipLineEndpoint(other);
+			ZipLineEndpoint otherEndpoint = ZipLineEndpoint(other);
+			otherEndpoint.ZipVisualConnectee = true;
+			return otherEndpoint;
 		}
 		Console.Printf("\cRWarning\cC: No other endpoint found for ZipLineEndpoint (TID %d)", TID);
 		return null;
