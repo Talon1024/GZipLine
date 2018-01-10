@@ -71,16 +71,20 @@ class ZipLineEndpoint : SwitchableDecoration
 		ZPLN A 0; // Why doesn't NoDelay work here?
 	Init:
 		"####" "#" 0 {
+			// Spawn interaction icon if defined
 			if (InteractionIcon) {
 				A_SpawnItemEx(InteractionIcon, 0.0, 0.0, 16.0);
 			}
 
+			// Spawn visual effect if defined
 			if (VisualEffect && !ZipVisualConnectee) {
+				// Set start/end visual effect positions
 				vector3 ZipVisualPosA = Pos;
 				ZipVisualPosA.Z += VisualZOffset;
 				vector3 ZipVisualPosB = OtherEndpoint.Pos;
 				ZipVisualPosB.Z += VisualZOffset;
 
+				// Spawn visual effect actors
 				A_SpawnActorLine(VisualEffect, ZipVisualPosA, ZipVisualPosB, 40.0);
 			}
 		}
@@ -96,17 +100,26 @@ class ZipLineEndpoint : SwitchableDecoration
 
 					// Initialize zip line active item
 					OnZipLine zipThing = OnZipLine(GiveInventoryType(ZippingItem));
+					
+					// Set start/finish endpoints
 					zipThing.StartEndpoint = self;
 					zipThing.FinishEndpoint = OtherEndpoint;
+					
+					// Set pitch, angle, and direction
 					zipThing.ZipLinePitch = PitchTo(OtherEndpoint);
 					zipThing.ZipLineAngle = AngleTo(OtherEndpoint, true);
 					zipThing.ZipLineDirection = ZipDirection;
+					
+					// Can player ascend and/or descend?
 					zipThing.PCanAscend = CanAscend();
 					zipThing.PCanDescend = CanDescend();
 					target.AddInventory(zipThing);
 
 					// Put player in front of endpoint to begin with
 					target.SetXYZ(Vec3Angle(ZipStartDistance, target.Angle, 0.0, false));
+					// Ensure player doesn't slip too far away from zip line.
+					target.Vel = (0,0,0);
+					// Make player face other endpoint
 					target.Angle = AngleTo(OtherEndpoint, true);
 					target.Pitch = PitchTo(OtherEndpoint);
 				}
@@ -142,49 +155,62 @@ class ZipLineEndpoint : SwitchableDecoration
 			// pointA, heading in the direction towards pointB
 			let position = pointA + i * pointAB;
 			Actor spawned = Spawn(classname, position, ALLOW_REPLACE);
+			// Set spawned actor's angle and pitch. Useful for flatsprite and 3D model actors.
 			spawned.angle = lineAngle;
 			spawned.pitch = linePitch;
 		}
 	}
 
 	ZipLineEndpoint FindOtherEndpoint() {
+		// Find other zip line endpoint using ActorIterator
 		ActorIterator iter = ActorIterator.Create(TID, "ZipLineEndpoint");
 		Actor other;
 		while (other = iter.Next()) {
 			if (other == self) continue;
+			// Set other endpoint as visual effet connectee
 			ZipLineEndpoint otherEndpoint = ZipLineEndpoint(other);
 			otherEndpoint.ZipVisualConnectee = true;
 			return otherEndpoint;
 		}
+		// No other endpoint found!
 		Console.Printf("\cRWarning\cC: No other endpoint found for ZipLineEndpoint (TID %d)", TID);
 		return null;
 	}
 
 	override void PostBeginPlay() {
+		// Find other endpoint
 		OtherEndpoint = FindOtherEndpoint();
+
+		// Set zip line direction
 		ZipDirection = 0;
 		if (OtherEndpoint.Pos.z < Pos.z) {
+			// Other endpoint is lower.
 			ZipDirection = -1;
 		} else if (OtherEndpoint.Pos.z > Pos.z) {
+			// Other endpoint is higher.
 			ZipDirection = 1;
 		}
 	}
 
 	virtual bool CanDescend() {
+		// Always allowed to ascend if straight.
 		if (ZipDirection == 0) return true;
+
+		// If zip line requires descent item
 		if (DescendItem != null) {
 			if (target.FindInventory(DescendItem)) {
 				return true;
+			// Cannot descend if you don't have the item
 			} else {
 				A_Print(DescendItemNeededMessage);
 				return false;
 			}
-		} else {
-			return true;
 		}
-		return false;
+		// Allow descent if no item required.
+		return true;
 	}
 
+	// Logic is mostly copy-pasted from CanDescend, with forwards/backwards reversed.
 	virtual bool CanAscend() {
 		if (ZipDirection == 0) return true;
 		if (AscendItem != null) {
@@ -194,12 +220,11 @@ class ZipLineEndpoint : SwitchableDecoration
 				A_Print(AscendItemNeededMessage);
 				return false;
 			}
-		} else {
-			return true;
 		}
-		return false;
+		return true;
 	}
 
+	// Since there is no PitchTo method of Actor, I had to write one myself.
 	double PitchTo(Actor other) {
 		double dist = Distance2D(other);
 		double vdist = self.Pos.Z - other.Pos.Z;
@@ -221,18 +246,18 @@ class ZipLineEndpoint : SwitchableDecoration
  * MaxSpeed defines the maximum speed for travelling on the zip line.
  */
 class OnZipLine : Inventory {
-	ZipLineEndpoint StartEndpoint;
-	ZipLineEndpoint FinishEndpoint;
+	ZipLineEndpoint StartEndpoint; // Endpoint the player started from
+	ZipLineEndpoint FinishEndpoint; // Endpoint the player will finish at
 	double MinFinishDistance; // Minimum distance to finish endpoint
 	double ZipLineAngle; // Angle of start endpoint to finish endpoint
 	double ZipLinePitch; // Pitch of zip line
 	double ZipLineSpeed; // Speed of zip line
 	double ZipLineMaxSpeed; // Max speed players can traverse zip lines
 	double ZipLineAccel; // Rate at which player can change speed on zip line
-	bool LeftStart;
-	bool PCanAscend;
-	bool PCanDescend;
-	int8 ZipLineDirection;
+	bool LeftStart; // Is the player far enough from the starting point?
+	bool PCanAscend; // Can the player ascend the zip line?
+	bool PCanDescend; // Is the player allowed to descend the zip line?
+	int8 ZipLineDirection; // 0 = no height diff, 1 = up, -1 = down
 
 	Property MinDistance: MinFinishDistance;
 	Property ZipLineSpeed: ZipLineSpeed;
@@ -258,10 +283,13 @@ class OnZipLine : Inventory {
 	sidemove - positive = right, negative = left, bounds = -12800, 12800
 	upmove - positive = up, negative = down, bounds = -768, 768
 	*/
+	// Get zip line acceleration
 	virtual double GetAccel(int forwardmove, int sidemove) {
+		// AngleFactors - how much the rider's angle affects acceleration.
 		double FwdAngleFactor = cos(Owner.Angle - ZipLineAngle);
 		double SideAngleFactor = sin(Owner.Angle - ZipLineAngle);
 
+		// InputFactors - how much the input affects acceleration.
 		double FwdInputFactor = forwardmove / 12800.0;
 		double SideInputFactor = sidemove / 12800.0;
 		
@@ -269,44 +297,61 @@ class OnZipLine : Inventory {
 	}
 
 	override void DoEffect() {
+		// Check if player has left start
 		if (!LeftStart && Owner.Distance3D(StartEndpoint) > MinFinishDistance) {
 			LeftStart = true;
 		}
 
-		if (Owner.Player) {
+		// Zip line control logic
+		// Only allow player control after leaving start point
+		if (Owner.Player && LeftStart) {
 
+			// Drop from zip line when player crouches
 			if (Owner.Player.cmd.buttons & BT_CROUCH != 0) {
-				Destroy(); // Drop from zip line when player crouches.
+				Destroy();
 				return;
 			}
 
+			// Accelerate or decelerate
 			ZipLineSpeed += GetAccel(Owner.Player.cmd.forwardmove, Owner.Player.cmd.sidemove);
+			// Ensure speed is within bounds
+			// Going straight
 			if (ZipLineDirection == 0) {
+				// Clamp speed within min/max boundary
 				if (ZipLineSpeed > ZipLineMaxSpeed) {
 					ZipLineSpeed = ZipLineMaxSpeed;
 				}
 				else if (ZipLineSpeed < -ZipLineMaxSpeed) {
 					ZipLineSpeed = -ZipLineMaxSpeed;
 				}
-			} else if (ZipLineDirection == 1) { 
+			// Going up
+			} else if (ZipLineDirection == 1) {
+				// Going forwards = ascending
 				if (ZipLineSpeed > 0) {
 					if (PCanAscend) {
+						// Don't go above max speed
 						if (ZipLineSpeed > ZipLineMaxSpeed) {
 							ZipLineSpeed = ZipLineMaxSpeed;
 						}
+					// Don't move if cannot ascend
 					} else {
 						ZipLineSpeed = 0;
 					}
 				}
+				// Negative speed = going backwards = descending
 				if (ZipLineSpeed < 0) {
 					if (PCanDescend) {
+						// Don't go below min speed
 						if (ZipLineSpeed < -ZipLineMaxSpeed) {
 							ZipLineSpeed = -ZipLineMaxSpeed;
 						}
+					// Don't move if cannot descend
 					} else {
 						ZipLineSpeed = 0;
 					}
 				}
+			// Going down
+			// Logic is mostly copy-pasted from the previous block, but with the backwards/forwards reversed. I don't know if there's a cleaner way to do this, but if there is, please let me know.
 			} else if (ZipLineDirection == -1) {
 				if (ZipLineSpeed > 0) {
 					if (PCanDescend) {
@@ -329,8 +374,12 @@ class OnZipLine : Inventory {
 			}
 		}
 
+		// Set owner's velocity
 		Owner.Vel3DFromAngle(ZipLineSpeed, ZipLineAngle, ZipLinePitch);
+
+		// Only allow leaving zip line after leaving start
 		if (LeftStart) {
+			// If player is close enough to one of the endpoints, leave the zip line.
 			if (Owner.Distance3D(StartEndpoint) < MinFinishDistance || 
 				Owner.Distance3D(FinishEndpoint) < MinFinishDistance) {
 				Destroy();
