@@ -1,0 +1,8 @@
+GameInfo {
+	SkyFlatName = "F_SKY1"
+}
+
+map demo "Zip Line Demo" {
+	LevelNum = 162
+	Sky1 = "RSKY1"
+}
