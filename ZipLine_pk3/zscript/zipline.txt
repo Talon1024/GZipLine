@@ -17,7 +17,7 @@
  * The DescendItemNeededMessage property defines the message to use if the player cannot descend the zip line without a particular item.
  * The StartDistance property defines the initial distance from the endpoint when the player gets on the zip line.
  */
-class ZipLineEndpoint : SwitchableDecoration
+class ZipLineEndpoint : Actor
 {
 	ZipLineEndpoint OtherEndpoint; // Other endpoint of zip line. Must have same TID as this endpoint.
 	class<OnZipLine> ZippingItem; // Item that performs the zip line physics logic.
@@ -54,7 +54,7 @@ class ZipLineEndpoint : SwitchableDecoration
 
 		Radius 16;
 		Height 32;
-		Activation THINGSPEC_ThingTargets | THINGSPEC_Switch; // THINGSPEC_Activate or Deactivate seems to only allow said thing to be either activated or deactivated for some stupid reason...
+		Activation THINGSPEC_Switch; // THINGSPEC_Activate or Deactivate seems to only allow said thing to be either activated or deactivated for some stupid reason...
 		ZipLineEndpoint.VisualEffect "ZipLineVisual";
 		ZipLineEndpoint.VisualZOffset 32.0;
 		ZipLineEndpoint.InteractionIcon "ProximityInteractionIcon";
@@ -68,64 +68,41 @@ class ZipLineEndpoint : SwitchableDecoration
 	States
 	{
 	Spawn:
-		ZPLN A 0; // Why doesn't NoDelay work here?
-	Init:
-		"####" "#" 0 {
-			// Spawn interaction icon if defined
-			if (InteractionIcon) {
-				A_SpawnItemEx(InteractionIcon, 0.0, 0.0, 16.0);
-			}
-
-			// Spawn visual effect if defined
-			if (VisualEffect && !ZipVisualConnectee) {
-				// Set start/end visual effect positions
-				vector3 ZipVisualPosA = Pos;
-				ZipVisualPosA.Z += VisualZOffset;
-				vector3 ZipVisualPosB = OtherEndpoint.Pos;
-				ZipVisualPosB.Z += VisualZOffset;
-
-				// Spawn visual effect actors
-				A_SpawnActorLine(VisualEffect, ZipVisualPosA, ZipVisualPosB, 40.0);
-			}
-		}
-	Idle:
-		"####" "#" -1;
+		ZPLN A -1;
 		Stop;
-	Active:
-		"####" "#" 0 {
-			if (OtherEndpoint) {
-				if ((ZipDirection == -1 && CanDescend()) ||
-					(ZipDirection == 1 && CanAscend()) ||
-					 ZipDirection == 0) {
+	}
 
-					// Initialize zip line active item
-					OnZipLine zipThing = OnZipLine(GiveInventoryType(ZippingItem));
-					
-					// Set start/finish endpoints
-					zipThing.StartEndpoint = self;
-					zipThing.FinishEndpoint = OtherEndpoint;
-					
-					// Set pitch, angle, and direction
-					zipThing.ZipLinePitch = PitchTo(OtherEndpoint);
-					zipThing.ZipLineAngle = AngleTo(OtherEndpoint, true);
-					zipThing.ZipLineDirection = ZipDirection;
-					
-					// Can player ascend and/or descend?
-					zipThing.PCanAscend = CanAscend();
-					zipThing.PCanDescend = CanDescend();
-					target.AddInventory(zipThing);
+	override bool Used(Actor user) {
+		if (OtherEndpoint) {
+			if ((ZipDirection == -1 && CanDescend()) ||
+				(ZipDirection == 1 && CanAscend()) ||
+				 ZipDirection == 0) {
 
-					// Put player in front of endpoint to begin with
-					target.SetXYZ(Vec3Angle(ZipStartDistance, target.Angle, 0.0, false));
-					// Make player face other endpoint
-					target.Angle = AngleTo(OtherEndpoint, true);
-					target.Pitch = PitchTo(OtherEndpoint);
-				}
+				// Initialize zip line active item
+				OnZipLine zipThing = OnZipLine(user.GiveInventoryType(ZippingItem));
+
+				// Set start/finish endpoints
+				zipThing.StartEndpoint = self;
+				zipThing.FinishEndpoint = OtherEndpoint;
+
+				// Set pitch, angle, and direction
+				zipThing.ZipLinePitch = PitchTo(OtherEndpoint);
+				zipThing.ZipLineAngle = AngleTo(OtherEndpoint, true);
+				zipThing.ZipLineDirection = ZipDirection;
+
+				// Can player ascend and/or descend?
+				zipThing.PCanAscend = CanAscend();
+				zipThing.PCanDescend = CanDescend();
+
+				// Put player in front of endpoint to begin with
+				user.SetXYZ(Vec3Angle(ZipStartDistance, user.Angle, 0.0, false));
+				// Make player face other endpoint
+				user.Angle = AngleTo(OtherEndpoint, true);
+				user.Pitch = PitchTo(OtherEndpoint);
+				return true;
 			}
 		}
-		Goto Idle;
-	Inactive:
-		Goto Active; // This works... Somehow.
+		return false;
 	}
 
 	// Thanks, ZWiki! This one is slightly modified so that the angle and pitch between the two points is taken into account.
@@ -187,6 +164,23 @@ class ZipLineEndpoint : SwitchableDecoration
 		} else if (OtherEndpoint.Pos.z > Pos.z) {
 			// Other endpoint is higher.
 			ZipDirection = 1;
+		}
+
+		// Spawn interaction icon if defined
+		if (InteractionIcon) {
+			A_SpawnItemEx(InteractionIcon, 0.0, 0.0, 16.0);
+		}
+
+		// Spawn visual effect if defined
+		if (VisualEffect && !ZipVisualConnectee) {
+			// Set start/end visual effect positions
+			vector3 ZipVisualPosA = Pos;
+			ZipVisualPosA.Z += VisualZOffset;
+			vector3 ZipVisualPosB = OtherEndpoint.Pos;
+			ZipVisualPosB.Z += VisualZOffset;
+
+			// Spawn visual effect actors
+			A_SpawnActorLine(VisualEffect, ZipVisualPosA, ZipVisualPosB, 40.0);
 		}
 	}
 
@@ -290,7 +284,7 @@ class OnZipLine : Inventory {
 		// InputFactors - how much the input affects acceleration.
 		double FwdInputFactor = forwardmove / 12800.0;
 		double SideInputFactor = sidemove / 12800.0;
-		
+
 		return ZipLineAccel * (FwdAngleFactor * FwdInputFactor + SideAngleFactor * SideInputFactor);
 	}
 
