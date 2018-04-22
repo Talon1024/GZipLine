@@ -54,7 +54,6 @@ class ZipLineEndpoint : Actor
 
 		Radius 16;
 		Height 32;
-		Activation THINGSPEC_Switch; // THINGSPEC_Activate or Deactivate seems to only allow said thing to be either activated or deactivated for some stupid reason...
 		ZipLineEndpoint.VisualEffect "ZipLineVisual";
 		ZipLineEndpoint.VisualZOffset 32.0;
 		ZipLineEndpoint.InteractionIcon "ProximityInteractionIcon";
@@ -62,7 +61,6 @@ class ZipLineEndpoint : Actor
 		ZipLineEndpoint.AscendItemNeededMessage "$ZIPASCENDITEMNEEDED";
 		ZipLineEndpoint.DescendItemNeededMessage "$ZIPDESCENDITEMNEEDED";
 		ZipLineEndpoint.StartDistance 16.0;
-		+USESPECIAL;
 	}
 
 	States
@@ -73,6 +71,7 @@ class ZipLineEndpoint : Actor
 	}
 
 	override bool Used(Actor user) {
+		if (user.FindInventory(ZippingItem, true)) return false;
 		if (OtherEndpoint) {
 			if ((ZipDirection == -1 && CanDescend()) ||
 				(ZipDirection == 1 && CanAscend()) ||
@@ -94,11 +93,22 @@ class ZipLineEndpoint : Actor
 				zipThing.PCanAscend = CanAscend();
 				zipThing.PCanDescend = CanDescend();
 
+				double zipAngle = AngleTo(OtherEndpoint, true);
+
 				// Put player in front of endpoint to begin with
-				user.SetXYZ(Vec3Angle(ZipStartDistance, user.Angle, 0.0, false));
+				user.SetOrigin(Vec3Angle(ZipStartDistance, zipAngle, 0.0, false), false);
 				// Make player face other endpoint
 				user.Angle = AngleTo(OtherEndpoint, true);
 				user.Pitch = PitchTo(OtherEndpoint);
+
+				// Stop player bobbing
+				if (user.Player) {
+					user.Player.bob = 0.0;
+					user.Player.vel = (0, 0);
+				}
+
+				Level.ExecuteSpecial(Special, user, null, null, Args[0], Args[1], Args[2], Args[3], Args[4]);
+
 				return true;
 			}
 		}
@@ -142,10 +152,10 @@ class ZipLineEndpoint : Actor
 		Actor other;
 		while (other = iter.Next()) {
 			if (other == self) continue;
-			// Set other endpoint as visual effet connectee
-			ZipLineEndpoint otherEndpoint = ZipLineEndpoint(other);
-			otherEndpoint.ZipVisualConnectee = true;
-			return otherEndpoint;
+			// Set other endpoint as visual effect connectee
+			ZipLineEndpoint otherEndpointFound = ZipLineEndpoint(other);
+			otherEndpointFound.ZipVisualConnectee = true;
+			return otherEndpointFound;
 		}
 		// No other endpoint found!
 		Console.Printf("\cRWarning\cC: No other endpoint found for ZipLineEndpoint (TID %d)", TID);
